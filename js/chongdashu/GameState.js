@@ -38,7 +38,7 @@ var p = GameState.prototype;
     p.backgroundGroup = null;
     p.agentGroup = null;
 
-    p.maxEnemies = 5;
+    p.maxEnemies = 1;
     p.enemySpawnCooldown = 5000;
     p.totalEnemiesCount = 0;
 
@@ -197,12 +197,13 @@ var p = GameState.prototype;
     };
 
     p.updatePhysics = function() {
+        this.game.physics.arcade.collide(this.agentGroup, this.enemyGroup);
         this.game.physics.arcade.collide(this.enemyGroup, this.enemyGroup);
     };
 
+
     p.updateGameEvents = function() {
         var elapsed = this.game.time.totalElapsedSeconds();
-        
     };
 
     p.updatePlayer = function() {
@@ -220,7 +221,13 @@ var p = GameState.prototype;
                 this.game.physics.arcade, // the context (object method belongs to)
                 false, // check exists
                 self.player,
-                GameState.ENEMY_SPEED_DEFAULT);   // parameter 
+                GameState.ENEMY_SPEED_DEFAULT);   // parameter
+        }
+
+        if (this.enemyGroup) {
+            this.enemyGroup.forEach(function(enemy) {
+                enemy.rotation = self.game.physics.arcade.angleBetween(enemy, self.player);
+            }, this, true);
         }
     };
 
