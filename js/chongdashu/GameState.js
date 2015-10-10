@@ -40,6 +40,7 @@ var p = GameState.prototype;
 
     p.maxEnemies = 5;
     p.enemySpawnCooldown = 5000;
+    p.totalEnemiesCount = 0;
 
     p.isDebugEnabled = false;
     p.gameEventTimer = null;
@@ -137,6 +138,16 @@ var p = GameState.prototype;
             "enemy-green");
         enemy.anchor.set(0.5, 0.5);
         this.game.physics.arcade.enable(enemy);
+        this.totalEnemiesCount++;
+
+        var self = this;
+        if (this.totalEnemiesCount == 1) {
+            // New event
+            this.doShoutEvent(0, "\"Oops.\"", 500, function() {
+                self.doShoutEvent(1000, "\"That doesn't look friendly.\"", 2000);
+            });
+            
+        }
     };
 
     p.createShoutText = function() {
@@ -152,6 +163,26 @@ var p = GameState.prototype;
         this.shoutText.anchor.setTo(0.5, 0.5);
         this.textGroup.add(this.shoutText);
         // this.shoutText.setTextBounds(-GLOBAL_GAME_WIDTH/2, -GLOBAL_GAME_HEIGHT+32, GLOBAL_GAME_WIDTH, GLOBAL_GAME_HEIGHT);
+    };
+
+    // do
+    // --------------------------------------------------------------
+    p.doShoutEvent = function(delay, text, duration, callback) {
+        var self = this;
+        
+        this.gameEventTimer.add(delay, function() {
+            // After the delay, set the shout text
+            self.shoutText.setText(text);
+            if (duration) {
+                // If duration is specified, set a new timer to turn off the text.
+                self.doShoutEvent(duration, "", null, callback);
+            }
+            else {
+                if (callback) {
+                    callback();
+                }
+            }
+        });
     };
 
     // update
