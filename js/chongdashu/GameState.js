@@ -19,6 +19,7 @@ var p = GameState.prototype;
 
     GameState.PLAYER_SPEED_X = 100;
     GameState.PLAYER_SPEED_Y = 100;
+    GameState.ENEMY_SPEED_DEFAULT = 80;
 
     p.prototypes = null;
     p.dataIndex = 0;
@@ -26,8 +27,8 @@ var p = GameState.prototype;
     p.backgroundGroup = null;
     p.agentGroup = null;
 
-    // Images
-    // ------
+    p.maxEnemies = 5;
+    p.enemySpawnCooldown = 5000;
     
     // @phaser
     p.preload = function() {
@@ -43,6 +44,7 @@ var p = GameState.prototype;
         this.createDebug();
         this.createGroups();
         this.createBackground();
+        this.createEnemySpawnTimer();
         this.createPlayer();
     };
 
@@ -54,12 +56,12 @@ var p = GameState.prototype;
         this.game.debug.font = "8px Verdana";
         this.game.debug.columnWidth = 50;
         console.log(this.game.debug.columnWidth);
-        
     };
 
     p.createGroups = function() {
         this.backgroundGroup = this.game.add.group();
         this.agentGroup = this.game.add.group();
+        this.enemyGroup = this.game.add.group();
     };
 
     p.createBackground = function() {
@@ -73,18 +75,52 @@ var p = GameState.prototype;
         this.game.physics.arcade.enable(this.player);
     };
 
+    p.createEnemySpawnTimer = function() {
+        var self = this;
+
+        this.enemySpawnTimer = this.game.time.create(false);
+        this.enemySpawnTimer.loop(this.enemySpawnCooldown, function() {
+            if (self.enemyGroup.length < self.maxEnemies) {
+                self.createEnemy();
+            }
+        }, this);
+        this.enemySpawnTimer.start();
+    };
+
+    p.createEnemy = function() {
+        var enemy = this.enemyGroup.create(
+            this.game.rnd.between(-124, 124),
+            this.game.rnd.between(108, -108),
+            "enemy-green");
+        enemy.anchor.set(0.5, 0.5);
+        this.game.physics.arcade.enable(enemy);
+    };
+
     // update
     // --------------------------------------------------------------
 
     // @phaser
     p.update = function() {
         this.updatePlayer();
+        this.updateEnemies();
     };
 
     p.updatePlayer = function() {
         if (this.player) {
             this.updatePlayerRotation();
             this.updatePlayerMovement();
+        }
+    };
+
+    p.updateEnemies = function() {
+        var self = this;
+        if (this.enemyGroup) {
+             this.enemyGroup.forEach(
+                this.game.physics.arcade.moveToObject, // method to call on each object
+                this.game.physics.arcade, // the context (object method belongs to)
+                false, // check exists
+                self.player,
+                GameState.ENEMY_SPEED_DEFAULT);   // parameter 
         }
     };
 
@@ -103,11 +139,11 @@ var p = GameState.prototype;
 
         if (!this.isPlayerMoveHorizontalDown()) {
             this.player.body.velocity.x = 0;
-        };
+        }
 
         if (!this.isPlayerMoveVerticalDown()) {
             this.player.body.velocity.y = 0;
-        };
+        }
 
         if (this.isPlayerMoveAnyDown()) {
             if (this.isPlayerMoveLeftDown()) {
@@ -123,7 +159,6 @@ var p = GameState.prototype;
                 this.player.body.velocity.y  = +GameState.PLAYER_SPEED_Y;
             }
         }
-        
     };
 
     // is

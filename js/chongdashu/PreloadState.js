@@ -47,6 +47,7 @@ var p = PreloadState.prototype;
         // --------------------
         this.load.image('background', 'res/background.png');
         this.load.image("player", "res/player.png");
+        this.load.image("enemy-green", "res/enemy-green.png");
        
     };
 
