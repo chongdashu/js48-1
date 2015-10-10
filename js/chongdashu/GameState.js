@@ -17,6 +17,9 @@ var GameState = function(game) {
 };
 var p = GameState.prototype;
 
+    GameState.PLAYER_SPEED_X = 100;
+    GameState.PLAYER_SPEED_Y = 100;
+
     p.prototypes = null;
     p.dataIndex = 0;
 
@@ -30,6 +33,9 @@ var p = GameState.prototype;
     p.preload = function() {
        
     };
+
+    // create
+    // --------------------------------------------------------------
 
     // @phaser
     p.create = function() {
@@ -67,6 +73,9 @@ var p = GameState.prototype;
         this.game.physics.arcade.enable(this.player);
     };
 
+    // update
+    // --------------------------------------------------------------
+
     // @phaser
     p.update = function() {
         this.updatePlayer();
@@ -74,31 +83,88 @@ var p = GameState.prototype;
 
     p.updatePlayer = function() {
         if (this.player) {
-            
-            // TODO: Update player rotation based on mouse position
-            // 
-            //                    M (Mx, My)
-            //                  /  |
-            //                /    |
-            //              /      |    
-            //            /        |
-            //   -      /          |
-            //         P - - - - - - 
-            //   +   (Px, Py)
-            // P: Player | M: Mouse
-            // Angle = tan-1 (My-Py) / (Mx-Py)
-            var mouseX = this.game.input.activePointer.worldX;
-            var mouseY = this.game.input.activePointer.worldY;
-            var playerX = this.player.x;
-            var playerY = this.player.y;
-
-            var radians =  this.game.math.angleBetween(playerX, playerY, mouseX, mouseY);
-            this.player.rotation = radians;
-
-
-
+            this.updatePlayerRotation();
+            this.updatePlayerMovement();
         }
     };
+
+    p.updatePlayerRotation = function() {
+
+        var mouseX = this.game.input.activePointer.worldX;
+        var mouseY = this.game.input.activePointer.worldY;
+        var playerX = this.player.x;
+        var playerY = this.player.y;
+
+        var radians =  this.game.math.angleBetween(playerX, playerY, mouseX, mouseY);
+        this.player.rotation = radians;
+    };
+
+    p.updatePlayerMovement = function() {
+
+        if (!this.isPlayerMoveHorizontalDown()) {
+            this.player.body.velocity.x = 0;
+        };
+
+        if (!this.isPlayerMoveVerticalDown()) {
+            this.player.body.velocity.y = 0;
+        };
+
+        if (this.isPlayerMoveAnyDown()) {
+            if (this.isPlayerMoveLeftDown()) {
+                this.player.body.velocity.x  = -GameState.PLAYER_SPEED_X;
+            }
+            if (this.isPlayerMoveRightDown()) {
+                this.player.body.velocity.x  = +GameState.PLAYER_SPEED_X;
+            }
+            if (this.isPlayerMoveUpDown()) {
+                this.player.body.velocity.y  = -GameState.PLAYER_SPEED_Y;
+            }
+            if (this.isPlayerMoveDownDown()) {
+                this.player.body.velocity.y  = +GameState.PLAYER_SPEED_Y;
+            }
+        }
+        
+    };
+
+    // is
+    // --------------------------------------------------------------
+    p.isPlayerMoveLeftDown = function() {
+        return  this.game.input.keyboard.isDown(Phaser.Keyboard.Left) ||
+                this.game.input.keyboard.isDown(Phaser.Keyboard.A);
+    };
+
+    p.isPlayerMoveRightDown = function() {
+        return  this.game.input.keyboard.isDown(Phaser.Keyboard.Right) ||
+                this.game.input.keyboard.isDown(Phaser.Keyboard.D);
+    };
+
+    p.isPlayerMoveUpDown = function() {
+        return  this.game.input.keyboard.isDown(Phaser.Keyboard.Up) ||
+                this.game.input.keyboard.isDown(Phaser.Keyboard.W);
+    };
+
+    p.isPlayerMoveDownDown = function() {
+        return  this.game.input.keyboard.isDown(Phaser.Keyboard.Down) ||
+                this.game.input.keyboard.isDown(Phaser.Keyboard.S);
+    };
+
+    p.isPlayerMoveHorizontalDown = function() {
+        return this.isPlayerMoveLeftDown() ||
+                this.isPlayerMoveRightDown();
+    };
+
+    p.isPlayerMoveVerticalDown = function() {
+        return this.isPlayerMoveUpDown() ||
+                this.isPlayerMoveDownDown();
+    };
+
+    p.isPlayerMoveAnyDown = function() {
+        return  this.isPlayerMoveVerticalDown() ||
+                this.isPlayerMoveHorizontalDown();
+    };
+
+    // render
+    // --------------------------------------------------------------
 
     p.render = function() {
         this.game.debug.spriteInfo(this.player, 16, 32);
