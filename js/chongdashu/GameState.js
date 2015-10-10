@@ -143,7 +143,7 @@ var p = GameState.prototype;
         var self = this;
         if (this.totalEnemiesCount == 1) {
             // New event
-            this.doShoutEvent(0, "\"Oops.\"", 500, function() {
+            this.doShoutEvent(0, "\"Oops.\"", 1000, function() {
                 self.doShoutEvent(1000, "\"That doesn't look friendly.\"", 2000);
             });
             
