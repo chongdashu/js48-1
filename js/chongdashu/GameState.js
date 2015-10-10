@@ -29,6 +29,8 @@ var p = GameState.prototype;
 
     p.maxEnemies = 5;
     p.enemySpawnCooldown = 5000;
+
+    p.isDebugEnabled = false;
     
     // @phaser
     p.preload = function() {
@@ -89,8 +91,8 @@ var p = GameState.prototype;
 
     p.createEnemy = function() {
         var enemy = this.enemyGroup.create(
-            this.game.rnd.between(-124, 124),
-            this.game.rnd.between(108, -108),
+            this.game.rnd.pick([-124, 124]),
+            this.game.rnd.pick([108, -108]),
             "enemy-green");
         enemy.anchor.set(0.5, 0.5);
         this.game.physics.arcade.enable(enemy);
@@ -202,10 +204,12 @@ var p = GameState.prototype;
     // --------------------------------------------------------------
 
     p.render = function() {
-        this.game.debug.spriteInfo(this.player, 16, 32);
-        this.game.debug.body(this.player);
-        this.game.debug.inputInfo(16, 128);
-        this.game.debug.pointer( this.game.input.activePointer );
+        if (this.isDebugEnabled) {
+            this.game.debug.spriteInfo(this.player, 16, 32);
+            this.game.debug.body(this.player);
+            this.game.debug.inputInfo(16, 128);
+            this.game.debug.pointer( this.game.input.activePointer );
+        }
     };
     
 
