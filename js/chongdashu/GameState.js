@@ -90,19 +90,35 @@ var p = GameState.prototype;
     };
 
     p.createPlayer = function() {
+        var self = this;
         this.player = this.agentGroup.create(0,0, "player_base");
-        // this.player = this.game.add.sprite(0,0,"player_base");
         this.player.anchor.set(0.5,0.5);
+        this.game.physics.arcade.enable(this.player);
 
+        // hand
+        this.player_hand = this.game.add.sprite(0,0, "player_hand");
+        this.player_hand.anchor.set(0.25, 0.5);
+        this.player.addChild(this.player_hand);
+        
+        this.player_hand.animations.add("idle", [0]);
+        var animation_punch = this.player_hand.animations.add("punch", [1,2,1,0], 15, false);
+        animation_punch.onComplete.add(function() {
+            console.log("huh?");
+            self.player_hand.animations.stop("idle", true);
+        },this);
+        this.player_hand.animations.stop("idle");
+
+        // head
         this.player_head = this.game.add.sprite(0, 0, "player_head");
         this.player_head.anchor.set(0.5, 0.5);
         this.player.addChild(this.player_head);
 
-        this.player_hand = this.game.add.sprite(0,0, "player_hand");
-        this.player_hand.anchor.set(0.25, 0.5);
-        this.player.addChild(this.player_hand);
+        // attack hitbox
+        this.player_attack_hitbox = this.game.add.sprite(0,0, "player_base");
+        this.player_attack_hitbox.anchor.set(0, 0.5);
+        this.player_attack_hitbox.alpha = 0;
+        this.player.addChild(this.player_attack_hitbox);
 
-        this.game.physics.arcade.enable(this.player);
     };
 
     p.createEnemySpawnTimer = function() {
@@ -216,10 +232,31 @@ var p = GameState.prototype;
     };
 
     p.updatePhysics = function() {
+        this.updateOverlaps();
         this.game.physics.arcade.collide(this.agentGroup, this.enemyGroup);
         this.game.physics.arcade.collide(this.enemyGroup, this.enemyGroup);
     };
 
+    p.updateOverlaps = function() {
+        var self = this;
+        if (this.player_hand) {
+
+            var handBounds = this.player_attack_hitbox.getBounds();
+
+            this.enemyGroup.forEach(function(enemy) {
+                var enemyBounds = enemy.getBounds();
+                if (Phaser.Rectangle.intersects(handBounds, enemyBounds)) {
+                    
+                    if (self.player_hand.animations.currentAnim.name === "punch" &&
+                        self.player_hand.animations.currentAnim.isPlaying) {
+                        
+                        enemy.destroy();
+                    }
+                }
+            }, this, true);
+        }
+       
+    };
 
     p.updateGameEvents = function() {
         var elapsed = this.game.time.totalElapsedSeconds();
@@ -229,6 +266,7 @@ var p = GameState.prototype;
         if (this.player) {
             this.updatePlayerRotation();
             this.updatePlayerMovement();
+            this.updatePlayerActions();
         }
     };
 
@@ -250,6 +288,14 @@ var p = GameState.prototype;
         }
     };
 
+    p.updatePlayerActions = function() {
+        if (this.game.input.activePointer.isDown) {
+            if (this.player_hand.animations.currentAnim.name === "idle") {
+                this.player_hand.animations.play("punch");
+            }
+        }
+    };
+
     p.updatePlayerRotation = function() {
 
         var mouseX = this.game.input.activePointer.worldX;
@@ -259,6 +305,7 @@ var p = GameState.prototype;
 
         var radians =  this.game.math.angleBetween(playerX, playerY, mouseX, mouseY);
         this.player.rotation = radians;
+        // this.player_hand.rotation = radians;
     };
 
     p.updatePlayerMovement = function() {
@@ -331,6 +378,8 @@ var p = GameState.prototype;
         if (this.isDebugEnabled) {
             this.game.debug.spriteInfo(this.player, 16, 32);
             this.game.debug.body(this.player);
+            // this.game.debug.spriteBounds(this.player_hand);
+            // this.game.debug.body(this.player_hand);
             this.game.debug.inputInfo(16, 128);
             this.game.debug.pointer( this.game.input.activePointer );
         }

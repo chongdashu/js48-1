@@ -49,8 +49,8 @@ var p = PreloadState.prototype;
         this.load.image("player", "res/player.png");
         this.load.image("player_base", "res/player_base.png");
         this.load.image("player_head", "res/player_head.png");
-        this.load.image("player_hand", "res/player_hand.png");
         this.load.image("enemy-green", "res/enemy-green.png");
+        this.load.spritesheet("player_hand", "res/player_hand.png", 48, 32);
         this.load.spritesheet("jelly", "res/jelly.png", 32, 32);
        
     };
