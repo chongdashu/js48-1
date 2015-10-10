@@ -17,6 +17,17 @@ var GameState = function(game) {
 };
 var p = GameState.prototype;
 
+    GameState.GAME_EVENT_INTROSHOUT_DELAY = 1000;
+    GameState.GAME_EVENT_INTROSHOUT_TEXT = "\"Don't worry, professor!\"";
+    GameState.GAME_EVENT_INTROSHOUT_2_DELAY = 3000;
+    GameState.GAME_EVENT_INTROSHOUT_2_TEXT = "\"I'll find a way to get you out!\"";
+    GameState.GAME_EVENT_INTROSHOUT_FINISH_DELAY = 3000;
+    GameState.GAME_EVENT_INTROSHOUT_FINISH_TEXT = "";
+
+    GameState.GAME_EVENT_INTRO_DELAY =  GameState.GAME_EVENT_INTROSHOUT_DELAY +
+                                        GameState.GAME_EVENT_INTROSHOUT_2_DELAY +
+                                        GameState.GAME_EVENT_INTROSHOUT_FINISH_DELAY;
+
     GameState.PLAYER_SPEED_X = 100;
     GameState.PLAYER_SPEED_Y = 100;
     GameState.ENEMY_SPEED_DEFAULT = 80;
@@ -31,6 +42,7 @@ var p = GameState.prototype;
     p.enemySpawnCooldown = 5000;
 
     p.isDebugEnabled = false;
+    p.gameEventTimer = null;
     
     // @phaser
     p.preload = function() {
@@ -48,6 +60,8 @@ var p = GameState.prototype;
         this.createBackground();
         this.createEnemySpawnTimer();
         this.createPlayer();
+        this.createShoutText();
+        this.createGameEvents();
     };
 
     p.createPhysics = function() {
@@ -64,6 +78,7 @@ var p = GameState.prototype;
         this.backgroundGroup = this.game.add.group();
         this.agentGroup = this.game.add.group();
         this.enemyGroup = this.game.add.group();
+        this.textGroup = this.game.add.group();
     };
 
     p.createBackground = function() {
@@ -81,12 +96,38 @@ var p = GameState.prototype;
         var self = this;
 
         this.enemySpawnTimer = this.game.time.create(false);
-        this.enemySpawnTimer.loop(this.enemySpawnCooldown, function() {
-            if (self.enemyGroup.length < self.maxEnemies) {
-                self.createEnemy();
-            }
+        this.enemySpawnTimer.add(GameState.GAME_EVENT_INTRO_DELAY, function() {
+            self.enemySpawnTimer.loop(self.enemySpawnCooldown, function() {
+                if (self.enemyGroup.length < self.maxEnemies) {
+                    self.createEnemy();
+                }
+            }, self);
+            self.enemySpawnTimer.start();
+
         }, this);
         this.enemySpawnTimer.start();
+    };
+
+    p.createGameEvents = function() {
+        var self = this;
+        this.gameEventTimer = this.game.time.create(false);
+
+        self.gameEventTimer.add(GameState.GAME_EVENT_INTROSHOUT_DELAY, function() {
+                self.shoutText.setText(GameState.GAME_EVENT_INTROSHOUT_TEXT);
+
+                self.gameEventTimer.add(GameState.GAME_EVENT_INTROSHOUT_2_DELAY, function() {
+                    self.shoutText.setText(GameState.GAME_EVENT_INTROSHOUT_2_TEXT);
+
+                    self.gameEventTimer.add(GameState.GAME_EVENT_INTROSHOUT_FINISH_DELAY, function() {
+                        self.shoutText.setText(GameState.GAME_EVENT_INTROSHOUT_FINISH_TEXT);
+                    }, this);
+                    self.gameEventTimer.start();
+
+                }, this);
+                self.gameEventTimer.start();
+        
+        }, this);
+        self.gameEventTimer.start();
     };
 
     p.createEnemy = function() {
@@ -98,13 +139,34 @@ var p = GameState.prototype;
         this.game.physics.arcade.enable(enemy);
     };
 
+    p.createShoutText = function() {
+        var style = {
+            font: "bold 32px Arial",
+            fill: "#fff",
+            boundsAlignH: "center",
+            boundsAlignV: "middle",
+            stroke: "black",
+            strokeThickness: 4
+        };
+        this.shoutText = this.game.add.text(0,-GLOBAL_GAME_HEIGHT/2+32, "", style);
+        this.shoutText.anchor.setTo(0.5, 0.5);
+        this.textGroup.add(this.shoutText);
+        // this.shoutText.setTextBounds(-GLOBAL_GAME_WIDTH/2, -GLOBAL_GAME_HEIGHT+32, GLOBAL_GAME_WIDTH, GLOBAL_GAME_HEIGHT);
+    };
+
     // update
     // --------------------------------------------------------------
 
     // @phaser
     p.update = function() {
+        this.updateGameEvents();
         this.updatePlayer();
         this.updateEnemies();
+    };
+
+    p.updateGameEvents = function() {
+        var elapsed = this.game.time.totalElapsedSeconds();
+        
     };
 
     p.updatePlayer = function() {
