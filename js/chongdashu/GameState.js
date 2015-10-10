@@ -30,7 +30,7 @@ var p = GameState.prototype;
 
     GameState.PLAYER_SPEED_X = 100;
     GameState.PLAYER_SPEED_Y = 100;
-    GameState.ENEMY_SPEED_DEFAULT = 80;
+    GameState.ENEMY_SPEED_DEFAULT = 50;
 
     p.prototypes = null;
     p.dataIndex = 0;
@@ -162,6 +162,11 @@ var p = GameState.prototype;
         this.updateGameEvents();
         this.updatePlayer();
         this.updateEnemies();
+        this.updatePhysics();
+    };
+
+    p.updatePhysics = function() {
+        this.game.physics.arcade.collide(this.enemyGroup, this.enemyGroup);
     };
 
     p.updateGameEvents = function() {
