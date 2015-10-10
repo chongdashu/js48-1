@@ -42,7 +42,7 @@ var p = GameState.prototype;
     p.enemySpawnCooldown = 5000;
     p.totalEnemiesCount = 0;
 
-    p.isDebugEnabled = false;
+    p.isDebugEnabled = true;
     p.gameEventTimer = null;
     
     // @phaser
@@ -78,8 +78,10 @@ var p = GameState.prototype;
     p.createGroups = function() {
         this.backgroundGroup = this.game.add.group();
         this.agentGroup = this.game.add.group();
+        this.jellyGroup = this.game.add.group();
         this.enemyGroup = this.game.add.group();
         this.textGroup = this.game.add.group();
+
     };
 
     p.createBackground = function() {
@@ -88,8 +90,18 @@ var p = GameState.prototype;
     };
 
     p.createPlayer = function() {
-        this.player = this.agentGroup.create(0,0, "player");
+        this.player = this.agentGroup.create(0,0, "player_base");
+        // this.player = this.game.add.sprite(0,0,"player_base");
         this.player.anchor.set(0.5,0.5);
+
+        this.player_head = this.game.add.sprite(0, 0, "player_head");
+        this.player_head.anchor.set(0.5, 0.5);
+        this.player.addChild(this.player_head);
+
+        this.player_hand = this.game.add.sprite(0,0, "player_hand");
+        this.player_hand.anchor.set(0.25, 0.5);
+        this.player.addChild(this.player_hand);
+
         this.game.physics.arcade.enable(this.player);
     };
 
@@ -163,6 +175,13 @@ var p = GameState.prototype;
         this.shoutText.anchor.setTo(0.5, 0.5);
         this.textGroup.add(this.shoutText);
         // this.shoutText.setTextBounds(-GLOBAL_GAME_WIDTH/2, -GLOBAL_GAME_HEIGHT+32, GLOBAL_GAME_WIDTH, GLOBAL_GAME_HEIGHT);
+    };
+
+    p.createJelly = function() {
+        var jelly = this.jellyGroup.create(0, 0, "jelly");
+
+        jelly.animations.add("idle", [0,1,0,2], 15, true);
+        jelly.animations.play("idle");
     };
 
     // do
