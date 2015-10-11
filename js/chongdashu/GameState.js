@@ -41,10 +41,14 @@ var p = GameState.prototype;
     p.agentGroup = null;
 
     p.maxEnemies = 1;
-    p.enemySpawnCooldown = 1000;
+    p.enemySpawnCooldown = 5000;
     p.totalEnemiesCount = 0;
 
-    p.isDebugEnabled = false;
+    p.jellySpawnCooldown = 5000;
+    p.jellyCount = 0;
+    p.jellyOpenedCount = 0;
+
+    p.isDebugEnabled = true;
     p.gameEventTimer = null;
     
     // @phaser
@@ -62,6 +66,7 @@ var p = GameState.prototype;
         this.createGroups();
         this.createBackground();
         this.createEnemySpawnTimer();
+        this.createJellySpawnTimer();
         this.createPlayer();
         this.createShoutText();
         this.createGameEvents();
@@ -136,7 +141,18 @@ var p = GameState.prototype;
             self.enemySpawnTimer.start();
 
         }, this);
-        this.enemySpawnTimer.start();
+        // this.enemySpawnTimer.start();
+    };
+
+    p.createJellySpawnTimer = function() {
+        var self = this;
+
+        this.jellySpawnTimer = this.game.time.create(false);
+
+        this.jellySpawnTimer.loop(self.jellySpawnCooldown, function() {
+                self.createJelly();
+        }, this);
+
     };
 
     p.createGameEvents = function() {
@@ -151,6 +167,7 @@ var p = GameState.prototype;
 
                     self.gameEventTimer.add(GameState.GAME_EVENT_INTROSHOUT_FINISH_DELAY, function() {
                         self.shoutText.setText(GameState.GAME_EVENT_INTROSHOUT_FINISH_TEXT);
+
                     }, this);
                     self.gameEventTimer.start();
 
@@ -159,12 +176,27 @@ var p = GameState.prototype;
         
         }, this);
         self.gameEventTimer.start();
+
+        this.doShoutEvent(12000, "\"I found something!\"", 1500, function() {
+            self.doShoutEvent(0, "\"I can drop agar jellies in.\"", 3000, function() {
+                self.doShoutEvent(0, "\"Here you go. Try hitting it.\"", 3000);
+                self.createJelly();
+            });
+        });
     };
 
-    p.createEnemy = function() {
+    p.createEnemy = function(x, y) {
+        if (typeof(x)=="undefined" || x === null) {
+            console.log("OLE_X");
+            x = this.game.rnd.pick([-124, 124]);
+        }
+        if (typeof(y)=="undefined" || y === null) {
+            console.log("OLE_Y");
+            y = this.game.rnd.pick([108, -108]);
+        }
         var enemy = this.enemyGroup.create(
-            this.game.rnd.pick([-124, 124]),
-            this.game.rnd.pick([108, -108]),
+            x,
+            y,
             "enemy-green");
         enemy.anchor.set(0.5, 0.5);
         this.game.physics.arcade.enable(enemy);
@@ -177,7 +209,9 @@ var p = GameState.prototype;
         if (this.totalEnemiesCount == 1) {
             // New event
             this.doShoutEvent(0, "\"Oops.\"", 1000, function() {
-                self.doShoutEvent(1000, "\"That doesn't look friendly.\"", 2000);
+                self.doShoutEvent(1000, "\"That doesn't look friendly.\"", 2000, function() {
+                    self.jellySpawnTimer.start();
+                });
             });
             
         }
@@ -207,6 +241,35 @@ var p = GameState.prototype;
 
     // do
     // --------------------------------------------------------------
+    p.doEnemyStun = function(enemy) {
+        var self = this;
+        // kickback
+        enemy.isStunned = true;
+        enemy.animations.play("stunned");
+
+        var opposingVelocity = enemy.body.velocity;
+        self.game.physics.arcade.velocityFromRotation(
+            // self.game.math.reverseAngle(enemy.body.rotation), // get reflected angle
+            self.player.rotation,
+            GameState.PLAYER_PUNCH_STRENGTH, // force/speed
+            opposingVelocity // resultant velocity
+        );
+
+        enemy.x += opposingVelocity.x;
+        enemy.y += opposingVelocity.y;
+
+        enemy.body.velocity.set(0,0);
+
+        enemy.stunnedTimer = self.game.time.create(true);
+        enemy.stunnedTimer.add(1000, function() {
+
+            enemy.isStunned = false;
+            enemy.animations.play("idle");
+
+        }, self);
+        enemy.stunnedTimer.start();
+    };
+
     p.doShoutEvent = function(delay, text, duration, callback) {
         var self = this;
         
@@ -244,9 +307,11 @@ var p = GameState.prototype;
 
     p.updateOverlaps = function() {
         var self = this;
-        if (this.player_hand) {
 
-            var handBounds = this.player_attack_hitbox.getBounds();
+        var handBounds = this.player_attack_hitbox.getBounds();
+
+        // hand touch enemy
+        if (this.player_hand) {
 
             this.enemyGroup.forEach(function(enemy) {
                 var enemyBounds = enemy.getBounds();
@@ -255,32 +320,32 @@ var p = GameState.prototype;
                     if (self.player_hand.animations.currentAnim.name === "punch" &&
                         self.player_hand.animations.currentAnim.isPlaying) {
                         
+                        self.doEnemyStun(enemy);
+
+                    }
+                }
+            }, this, true);
+        }
+
+        // hand touch jelly
+        if (this.player_hand) {
+
+            this.jellyGroup.forEach(function(jelly) {
+                var jellyBounds = jelly.getBounds();
+                
+                if (Phaser.Rectangle.intersects(handBounds, jellyBounds)) {
+                    
+                    if (self.player_hand.animations.currentAnim.name === "punch" &&
+                        self.player_hand.animations.currentAnim.isPlaying) {
                         
-                        // kickback
-                        enemy.isStunned = true;
-                        enemy.animations.play("stunned");
+                        jelly.destroy();
+                        self.jellyOpenedCount++;
 
-                        var opposingVelocity = enemy.body.velocity;
-                        self.game.physics.arcade.velocityFromRotation(
-                            // self.game.math.reverseAngle(enemy.body.rotation), // get reflected angle
-                            self.player.rotation,
-                            GameState.PLAYER_PUNCH_STRENGTH, // force/speed
-                            opposingVelocity // resultant velocity
-                        );
+                        if (self.jellyOpenedCount == 1) {
+                            self.jellySpawnTimer.start();
+                            self.createEnemy(0,0);
 
-                        enemy.x += opposingVelocity.x;
-                        enemy.y += opposingVelocity.y;
-
-                        enemy.body.velocity.set(0,0);
-
-                        enemy.stunnedTimer = self.game.time.create(true);
-                        enemy.stunnedTimer.add(1000, function() {
-
-                            enemy.isStunned = false;
-                            enemy.animations.play("idle");
-
-                        }, self);
-                        enemy.stunnedTimer.start();
+                        }
 
                     }
                 }
@@ -416,10 +481,12 @@ var p = GameState.prototype;
         if (this.isDebugEnabled) {
             this.game.debug.spriteInfo(this.player, 16, 32);
             this.game.debug.body(this.player);
-            // this.game.debug.spriteBounds(this.player_hand);
+            // this.game.debug.spriteBounds(this.player_attack_hitbox);
             // this.game.debug.body(this.player_hand);
             this.game.debug.inputInfo(16, 128);
             this.game.debug.pointer( this.game.input.activePointer );
+            this.game.debug.timer(this.enemySpawnTimer, 16, 256);
+            this.game.debug.timer(this.jellySpawnTimer, 256, 256);
         }
     };
     
