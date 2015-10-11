@@ -52,7 +52,7 @@ var p = GameState.prototype;
 
     p.bananaEatenCount = 0;
 
-    p.isDebugEnabled = true;
+    p.isDebugEnabled = false;
     p.gameEventTimer = null;
     
     // @phaser
@@ -187,7 +187,7 @@ var p = GameState.prototype;
         this.doShoutEvent(12000, "\"I found something!\"", 1500, function() {
             self.doShoutEvent(0, "\"I can drop agar jellies in.\"", 3000, function() {
                 self.doShoutEvent(0, "\"Here you go. Try hitting it.\"", 3000);
-                self.createJelly();
+                self.createJelly(0, 0);
             });
         });
     };
@@ -215,7 +215,7 @@ var p = GameState.prototype;
             // New event
             this.doShoutEvent(1000, "\"Oops.\"", 1500, function() {
                 self.doShoutEvent(1000, "\"That doesn't look friendly.\"", 2000, function() {
-                    
+                    self.jellySpawnTimer.resume();
                 });
             });
             
@@ -224,7 +224,7 @@ var p = GameState.prototype;
 
     p.createShoutText = function() {
         var style = {
-            font: "bold 32px Arial",
+            font: "bold 28px Arial",
             fill: "#fff",
             boundsAlignH: "center",
             boundsAlignV: "middle",
@@ -246,13 +246,27 @@ var p = GameState.prototype;
             stroke: "black",
             strokeThickness: 4
         };
-        this.scoreText = this.game.add.text(0,-GLOBAL_GAME_HEIGHT/2+32*3, "", style);
+        this.scoreText = this.game.add.text(+GLOBAL_GAME_WIDTH/2-48,+GLOBAL_GAME_HEIGHT/2-32, "", style);
         this.scoreText.anchor.setTo(0.5, 0.5);
         this.textGroup.add(this.scoreText);
+
+        this.scoreText.visible = false;
+
+
+        // this.scoreIcon = this.game.add.sprite(+GLOBAL_GAME_WIDTH/2-72,+GLOBAL_GAME_HEIGHT/2-32, "banana");
+        // this.scoreIcon.anchor.setTo(0.5, 0.5);
+        // this.textGroup.add(this.scoreIcon);
     };
 
-    p.createJelly = function() {
-        var jelly = this.jellyGroup.create(0, 0, "jelly");
+    p.createJelly = function(x, y) {
+        if (typeof(x)=="undefined" || x === null) {
+            x = this.game.rnd.between(-124, 124);
+        }
+        if (typeof(y)=="undefined" || y === null) {
+            y = this.game.rnd.between(108, -108);
+        }
+
+        var jelly = this.jellyGroup.create(x, y, "jelly");
         jelly.anchor.set(0.5, 0.5);
         this.game.physics.arcade.enable(jelly);
         jelly.body.immovable = true;
@@ -265,7 +279,11 @@ var p = GameState.prototype;
             var text = this.game.rnd.pick([
                 "\"Here comes one!\"",
                 "\"Another one!\"",
-                "\"...\""
+                "\"Incoming!!\"",
+                "",
+                "",
+                "",
+                ""
             ]);
 
             this.doShoutEvent(0, text, 1500);
@@ -419,22 +437,41 @@ var p = GameState.prototype;
                         console.log("self.jellyOpenedCount=%s", self.jellyOpenedCount);
 
                         if (self.jellyOpenedCount == 1) {
-                            self.doBananaDrop();
+                            self.doBananaDrop(jelly.x, jelly.y);
 
                             self.doShoutEvent(0, "\"Bananas contain Potassium\"", 3500, function() {
                                 self.doShoutEvent(0, "\"Just touch it to eat it.", 3000);
                             });
                         }
                         else {
-                            if (self.jellyOpenedCount < 4) {
-                                self.doBananaDrop();
+                            if (self.jellyOpenedCount < 5) {
+                                self.doBananaDrop(jelly.x, jelly.y);
+                                self.jellySpawnTimer.resume();
                             }
 
-                            if (self.jellyOpenedCount == 4) {
+                            if (self.jellyOpenedCount == 5) {
                                 self.createEnemy(jelly.x, jelly.y);
+                                self.jellySpawnTimer.pause();
                             }
 
-                            self.jellySpawnTimer.resume();
+                            if (self.jellyOpenedCount > 5 && self.jellyOpenedCount < 7) {
+                                var choice = self.game.rnd.weightedPick(["banana", "enemy"]);
+                                if (choice === "banana") {
+                                    self.doBananaDrop(jelly.x, jelly.y);
+                                }
+                                else if (choice === "enemy") {
+                                    self.createEnemey(jelly.x, jelly.y);
+                                }
+                                self.jellySpawnTimer.resume();
+                            }
+
+                            if (self.jellyOpenedCount == 7) {
+                                self.doShoutEvent(500, "\"Aha!\"", 1000, function() {
+                                    self.doShoutEvent(0, "\"Found something that might help\"");
+                                });
+                            }
+
+                            
                             
                         }
 
@@ -578,11 +615,15 @@ var p = GameState.prototype;
         this.bananaEatenCount++;
         if (this.bananaEatenCount == 1) {
             self.doShoutEvent(0, "\"Eat " + GameState.BANANAS_TO_WIN + " of them!", 2000, function() {
+                self.scoreText.visible = true;
                 self.doShoutEvent(0, "\"You will grow back to normal.\"", 2000, function() {
                     self.doShoutEvent(0, "\"Good luck!\"", 2000);
                     self.jellySpawnTimer.start();
                 });
             });
+        }
+        if (this.bananaEatenCount == 4) {
+            self.doShoutEvent(0, "\"You're doing great!", 2000);
         }
         
     };
