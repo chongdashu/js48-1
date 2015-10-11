@@ -32,6 +32,8 @@ var p = GameState.prototype;
     GameState.PLAYER_SPEED_Y = 100;
     GameState.ENEMY_SPEED_DEFAULT = 50;
 
+    GameState.PLAYER_PUNCH_STRENGTH = 25;
+
     p.prototypes = null;
     p.dataIndex = 0;
 
@@ -39,10 +41,10 @@ var p = GameState.prototype;
     p.agentGroup = null;
 
     p.maxEnemies = 1;
-    p.enemySpawnCooldown = 5000;
+    p.enemySpawnCooldown = 1000;
     p.totalEnemiesCount = 0;
 
-    p.isDebugEnabled = true;
+    p.isDebugEnabled = false;
     p.gameEventTimer = null;
     
     // @phaser
@@ -101,7 +103,7 @@ var p = GameState.prototype;
         this.player.addChild(this.player_hand);
         
         this.player_hand.animations.add("idle", [0]);
-        var animation_punch = this.player_hand.animations.add("punch", [1,2,1,0], 15, false);
+        var animation_punch = this.player_hand.animations.add("punch", [1,2,1,0], 20, false);
         animation_punch.onComplete.add(function() {
             console.log("huh?");
             self.player_hand.animations.stop("idle", true);
@@ -167,6 +169,9 @@ var p = GameState.prototype;
         enemy.anchor.set(0.5, 0.5);
         this.game.physics.arcade.enable(enemy);
         this.totalEnemiesCount++;
+
+        enemy.animations.add("idle", [0]);
+        enemy.animations.add("stunned", [1,2,3,2], 10, true);
 
         var self = this;
         if (this.totalEnemiesCount == 1) {
@@ -250,7 +255,33 @@ var p = GameState.prototype;
                     if (self.player_hand.animations.currentAnim.name === "punch" &&
                         self.player_hand.animations.currentAnim.isPlaying) {
                         
-                        enemy.destroy();
+                        
+                        // kickback
+                        enemy.isStunned = true;
+                        enemy.animations.play("stunned");
+
+                        var opposingVelocity = enemy.body.velocity;
+                        self.game.physics.arcade.velocityFromRotation(
+                            // self.game.math.reverseAngle(enemy.body.rotation), // get reflected angle
+                            self.player.rotation,
+                            GameState.PLAYER_PUNCH_STRENGTH, // force/speed
+                            opposingVelocity // resultant velocity
+                        );
+
+                        enemy.x += opposingVelocity.x;
+                        enemy.y += opposingVelocity.y;
+
+                        enemy.body.velocity.set(0,0);
+
+                        enemy.stunnedTimer = self.game.time.create(true);
+                        enemy.stunnedTimer.add(1000, function() {
+
+                            enemy.isStunned = false;
+                            enemy.animations.play("idle");
+
+                        }, self);
+                        enemy.stunnedTimer.start();
+
                     }
                 }
             }, this, true);
@@ -272,13 +303,20 @@ var p = GameState.prototype;
 
     p.updateEnemies = function() {
         var self = this;
+        // if (this.enemyGroup) {
+        //      this.enemyGroup.forEach(
+        //         this.game.physics.arcade.moveToObject, // method to call on each object
+        //         this.game.physics.arcade, // the context (object method belongs to)
+        //         false, // check exists
+        //         self.player,
+        //         GameState.ENEMY_SPEED_DEFAULT);   // parameter
+        // }
         if (this.enemyGroup) {
-             this.enemyGroup.forEach(
-                this.game.physics.arcade.moveToObject, // method to call on each object
-                this.game.physics.arcade, // the context (object method belongs to)
-                false, // check exists
-                self.player,
-                GameState.ENEMY_SPEED_DEFAULT);   // parameter
+            this.enemyGroup.forEach(function(enemy) {
+                if (!enemy.isStunned) {
+                    self.game.physics.arcade.moveToObject(enemy, self.player, GameState.ENEMY_SPEED_DEFAULT);
+                }
+            }, this, true);
         }
 
         if (this.enemyGroup) {
