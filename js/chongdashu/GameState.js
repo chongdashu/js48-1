@@ -234,6 +234,9 @@ var p = GameState.prototype;
 
     p.createJelly = function() {
         var jelly = this.jellyGroup.create(0, 0, "jelly");
+        jelly.anchor.set(0.5, 0.5);
+        this.game.physics.arcade.enable(jelly);
+        jelly.body.immovable = true;
 
         jelly.animations.add("idle", [0,1,0,2], 15, true);
         jelly.animations.play("idle");
@@ -303,6 +306,8 @@ var p = GameState.prototype;
         this.updateOverlaps();
         this.game.physics.arcade.collide(this.agentGroup, this.enemyGroup);
         this.game.physics.arcade.collide(this.enemyGroup, this.enemyGroup);
+        this.game.physics.arcade.collide(this.agentGroup, this.jellyGroup);
+        this.game.physics.arcade.collide(this.enemyGroup, this.jellyGroup);
     };
 
     p.updateOverlaps = function() {
