@@ -34,6 +34,8 @@ var p = GameState.prototype;
 
     GameState.PLAYER_PUNCH_STRENGTH = 25;
 
+    GameState.BANANAS_TO_WIN = 20;
+
     p.prototypes = null;
     p.dataIndex = 0;
 
@@ -47,6 +49,8 @@ var p = GameState.prototype;
     p.jellySpawnCooldown = 5000;
     p.jellyCount = 0;
     p.jellyOpenedCount = 0;
+
+    p.bananaEatenCount = 0;
 
     p.isDebugEnabled = true;
     p.gameEventTimer = null;
@@ -69,6 +73,7 @@ var p = GameState.prototype;
         this.createJellySpawnTimer();
         this.createPlayer();
         this.createShoutText();
+        this.createScoreText();
         this.createGameEvents();
     };
 
@@ -80,15 +85,17 @@ var p = GameState.prototype;
         this.game.debug.font = "8px Verdana";
         this.game.debug.columnWidth = 50;
         console.log(this.game.debug.columnWidth);
+
+        this.game.stage.disableVisibilityChange = this.isDebugEnabled;
     };
 
     p.createGroups = function() {
         this.backgroundGroup = this.game.add.group();
         this.agentGroup = this.game.add.group();
         this.jellyGroup = this.game.add.group();
+        this.bananaGroup = this.game.add.group();
         this.enemyGroup = this.game.add.group();
         this.textGroup = this.game.add.group();
-
     };
 
     p.createBackground = function() {
@@ -110,7 +117,6 @@ var p = GameState.prototype;
         this.player_hand.animations.add("idle", [0]);
         var animation_punch = this.player_hand.animations.add("punch", [1,2,1,0], 20, false);
         animation_punch.onComplete.add(function() {
-            console.log("huh?");
             self.player_hand.animations.stop("idle", true);
         },this);
         this.player_hand.animations.stop("idle");
@@ -151,6 +157,7 @@ var p = GameState.prototype;
 
         this.jellySpawnTimer.loop(self.jellySpawnCooldown, function() {
                 self.createJelly();
+                self.jellySpawnTimer.pause();
         }, this);
 
     };
@@ -187,11 +194,9 @@ var p = GameState.prototype;
 
     p.createEnemy = function(x, y) {
         if (typeof(x)=="undefined" || x === null) {
-            console.log("OLE_X");
             x = this.game.rnd.pick([-124, 124]);
         }
         if (typeof(y)=="undefined" || y === null) {
-            console.log("OLE_Y");
             y = this.game.rnd.pick([108, -108]);
         }
         var enemy = this.enemyGroup.create(
@@ -208,9 +213,9 @@ var p = GameState.prototype;
         var self = this;
         if (this.totalEnemiesCount == 1) {
             // New event
-            this.doShoutEvent(0, "\"Oops.\"", 1000, function() {
+            this.doShoutEvent(1000, "\"Oops.\"", 1500, function() {
                 self.doShoutEvent(1000, "\"That doesn't look friendly.\"", 2000, function() {
-                    self.jellySpawnTimer.start();
+                    
                 });
             });
             
@@ -232,6 +237,20 @@ var p = GameState.prototype;
         // this.shoutText.setTextBounds(-GLOBAL_GAME_WIDTH/2, -GLOBAL_GAME_HEIGHT+32, GLOBAL_GAME_WIDTH, GLOBAL_GAME_HEIGHT);
     };
 
+    p.createScoreText = function() {
+        var style = {
+            font: "bold 48px Helvetica",
+            fill: "#FFF100",
+            boundsAlignH: "center",
+            boundsAlignV: "middle",
+            stroke: "black",
+            strokeThickness: 4
+        };
+        this.scoreText = this.game.add.text(0,-GLOBAL_GAME_HEIGHT/2+32*3, "", style);
+        this.scoreText.anchor.setTo(0.5, 0.5);
+        this.textGroup.add(this.scoreText);
+    };
+
     p.createJelly = function() {
         var jelly = this.jellyGroup.create(0, 0, "jelly");
         jelly.anchor.set(0.5, 0.5);
@@ -240,10 +259,53 @@ var p = GameState.prototype;
 
         jelly.animations.add("idle", [0,1,0,2], 15, true);
         jelly.animations.play("idle");
+
+        if (this.jellyOpenedCount > 0) {
+            // We've already done the intro, can speak random stuff here now.
+            var text = this.game.rnd.pick([
+                "\"Here comes one!\"",
+                "\"Another one!\"",
+                "\"...\""
+            ]);
+
+            this.doShoutEvent(0, text, 1500);
+        }
+
+    };
+
+    p.createBanana = function(x, y) {
+        if (typeof(x)=="undefined" || x === null) {
+            x = 0;
+        }
+        if (typeof(y)=="undefined" || y === null) {
+            y = 0;
+        }
+
+        var jelly = this.bananaGroup.create(x, y, "banana");
+        jelly.anchor.set(0.5, 0.5);
+        this.game.physics.arcade.enable(jelly);
+        jelly.body.immovable = true;
+
+        return jelly;
     };
 
     // do
     // --------------------------------------------------------------
+
+    p.doBananaDrop = function(x, y) {
+        var self = this;
+        var banana = self.createBanana(x, y);
+        var opposingVelocity = new Phaser.Point();
+        self.game.physics.arcade.velocityFromRotation(
+            // self.game.math.reverseAngle(enemy.body.rotation), // get reflected angle
+            self.player.rotation,
+            GameState.PLAYER_PUNCH_STRENGTH, // force/speed
+            opposingVelocity // resultant velocity
+        );
+
+        banana.x += opposingVelocity.x;
+        banana.y += opposingVelocity.y;
+    };
     p.doEnemyStun = function(enemy) {
         var self = this;
         // kickback
@@ -300,6 +362,13 @@ var p = GameState.prototype;
         this.updatePlayer();
         this.updateEnemies();
         this.updatePhysics();
+        this.updateText();
+    };
+
+    p.updateText = function() {
+        if (this.scoreText) {
+            this.scoreText.setText(this.bananaEatenCount);
+        }
     };
 
     p.updatePhysics = function() {
@@ -308,6 +377,7 @@ var p = GameState.prototype;
         this.game.physics.arcade.collide(this.enemyGroup, this.enemyGroup);
         this.game.physics.arcade.collide(this.agentGroup, this.jellyGroup);
         this.game.physics.arcade.collide(this.enemyGroup, this.jellyGroup);
+        this.game.physics.arcade.collide(this.agentGroup, this.bananaGroup, this.onAgentBananaCollide, null, this);
     };
 
     p.updateOverlaps = function() {
@@ -346,11 +416,31 @@ var p = GameState.prototype;
                         jelly.destroy();
                         self.jellyOpenedCount++;
 
-                        if (self.jellyOpenedCount == 1) {
-                            self.jellySpawnTimer.start();
-                            self.createEnemy(0,0);
+                        console.log("self.jellyOpenedCount=%s", self.jellyOpenedCount);
 
+                        if (self.jellyOpenedCount == 1) {
+                            self.doBananaDrop();
+
+                            self.doShoutEvent(0, "\"Bananas contain Potassium\"", 3500, function() {
+                                self.doShoutEvent(0, "\"Just touch it to eat it.", 3000);
+                            });
                         }
+                        else {
+                            if (self.jellyOpenedCount < 4) {
+                                self.doBananaDrop();
+                            }
+
+                            if (self.jellyOpenedCount == 4) {
+                                self.createEnemy(jelly.x, jelly.y);
+                            }
+
+                            self.jellySpawnTimer.resume();
+                            
+                        }
+
+                        
+
+
 
                     }
                 }
@@ -477,6 +567,24 @@ var p = GameState.prototype;
     p.isPlayerMoveAnyDown = function() {
         return  this.isPlayerMoveVerticalDown() ||
                 this.isPlayerMoveHorizontalDown();
+    };
+
+    // on
+    // --------------------------------------------------------------
+
+    p.onAgentBananaCollide = function(agent, banana) {
+        var self = this;
+        banana.destroy();
+        this.bananaEatenCount++;
+        if (this.bananaEatenCount == 1) {
+            self.doShoutEvent(0, "\"Eat " + GameState.BANANAS_TO_WIN + " of them!", 2000, function() {
+                self.doShoutEvent(0, "\"You will grow back to normal.\"", 2000, function() {
+                    self.doShoutEvent(0, "\"Good luck!\"", 2000);
+                    self.jellySpawnTimer.start();
+                });
+            });
+        }
+        
     };
 
     // render
