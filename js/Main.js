@@ -17,6 +17,8 @@ $(document).ready(function() {
     game.state.add("BootState", chongdashu.BootState);
     game.state.add("PreloadState", chongdashu.PreloadState);
     game.state.add("GameState", chongdashu.GameState);
+    game.state.add("WinState", chongdashu.WinState);
+    game.state.add("MenuState", chongdashu.MenuState);
 
     // Start with boot sequence.
     // -------------------------

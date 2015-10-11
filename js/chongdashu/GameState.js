@@ -33,6 +33,8 @@ var p = GameState.prototype;
     GameState.ENEMY_SPEED_DEFAULT = 50;
 
     GameState.PLAYER_PUNCH_STRENGTH = 25;
+    GameState.PLAYER_HURT_STRENGTH = 25;
+    GameState.PLAYER_SHOOT_STRENGTH = 800;
 
     GameState.BANANAS_TO_WIN = 20;
 
@@ -54,6 +56,9 @@ var p = GameState.prototype;
 
     p.isDebugEnabled = false;
     p.gameEventTimer = null;
+
+    p.weaponIndex = 0;
+    p.weapons = ["punch"];
     
     // @phaser
     p.preload = function() {
@@ -74,7 +79,19 @@ var p = GameState.prototype;
         this.createPlayer();
         this.createShoutText();
         this.createScoreText();
+        this.createWeaponText();
         this.createGameEvents();
+        this.createKeyboardCallbacks();
+    };
+
+    p.createKeyboardCallbacks = function() {
+        var self = this;
+        this.game.input.keyboard.onUpCallback = function( e ){
+            if(e.keyCode == Phaser.Keyboard.Q){
+                // do player switch
+                self.doWeaponSwitch();
+            }
+        };
     };
 
     p.createPhysics = function() {
@@ -96,6 +113,8 @@ var p = GameState.prototype;
         this.bananaGroup = this.game.add.group();
         this.enemyGroup = this.game.add.group();
         this.textGroup = this.game.add.group();
+        this.saltGroup = this.game.add.group();
+        this.shooterGroup = this.game.add.group();
     };
 
     p.createBackground = function() {
@@ -115,10 +134,15 @@ var p = GameState.prototype;
         this.player.addChild(this.player_hand);
         
         this.player_hand.animations.add("idle", [0]);
-        var animation_punch = this.player_hand.animations.add("punch", [1,2,1,0], 20, false);
+        var animation_punch = this.player_hand.animations.add("punch", [0,1,2,1,0], 20, false);
         animation_punch.onComplete.add(function() {
             self.player_hand.animations.stop("idle", true);
         },this);
+        var animation_shoot = this.player_hand.animations.add("shoot", [3,0,3], 5, false);
+        animation_shoot.onComplete.add(function() {
+            self.player_hand.animations.stop("shoot", true);
+        },this);
+
         this.player_hand.animations.stop("idle");
 
         // head
@@ -131,6 +155,8 @@ var p = GameState.prototype;
         this.player_attack_hitbox.anchor.set(0, 0.5);
         this.player_attack_hitbox.alpha = 0;
         this.player.addChild(this.player_attack_hitbox);
+
+        this.player.body.collideWorldBounds=true;
 
     };
 
@@ -157,7 +183,10 @@ var p = GameState.prototype;
 
         this.jellySpawnTimer.loop(self.jellySpawnCooldown, function() {
                 self.createJelly();
-                self.jellySpawnTimer.pause();
+                if (self.jellyOpenedCount < 10) {
+                    self.jellySpawnTimer.pause();
+                }
+                
         }, this);
 
     };
@@ -184,12 +213,28 @@ var p = GameState.prototype;
         }, this);
         self.gameEventTimer.start();
 
+        this.doShoutEvent(8000, "\"Use WASD to move around in the meantime.\"", 2000);
+
         this.doShoutEvent(12000, "\"I found something!\"", 1500, function() {
             self.doShoutEvent(0, "\"I can drop agar jellies in.\"", 3000, function() {
                 self.doShoutEvent(0, "\"Here you go. Try hitting it.\"", 3000);
                 self.createJelly(0, 0);
             });
         });
+    };
+
+    p.createShooter = function(x, y) {
+         if (typeof(x)=="undefined" || x === null) {
+            x = 0;
+        }
+        if (typeof(y)=="undefined" || y === null) {
+            y = 0;
+        }
+
+        this.shooter = this.shooterGroup.create(x, y, "shooter");
+        this.shooter.anchor.set(0.5, 0.5);
+        this.game.physics.arcade.enable(this.shooter);
+        this.shooter.body.immovable = true;
     };
 
     p.createEnemy = function(x, y) {
@@ -220,11 +265,13 @@ var p = GameState.prototype;
             });
             
         }
+
+        enemy.body.collideWorldBounds=true;
     };
 
     p.createShoutText = function() {
         var style = {
-            font: "bold 28px Arial",
+            font: "bold 20px Arial",
             fill: "#fff",
             boundsAlignH: "center",
             boundsAlignV: "middle",
@@ -256,6 +303,22 @@ var p = GameState.prototype;
         // this.scoreIcon = this.game.add.sprite(+GLOBAL_GAME_WIDTH/2-72,+GLOBAL_GAME_HEIGHT/2-32, "banana");
         // this.scoreIcon.anchor.setTo(0.5, 0.5);
         // this.textGroup.add(this.scoreIcon);
+    };
+
+    p.createWeaponText = function() {
+        var style = {
+            font: "bold 32px Helvetica",
+            fill: "#FFFefe",
+            boundsAlignH: "left",
+            boundsAlignV: "middle",
+            stroke: "black",
+            strokeThickness: 4
+        };
+        this.weaponText = this.game.add.text(-GLOBAL_GAME_WIDTH/2+16,+GLOBAL_GAME_HEIGHT/2-32, "", style);
+        this.weaponText.anchor.setTo(0, 0.5);
+        this.textGroup.add(this.weaponText);
+
+        this.weaponText.visible = false;
     };
 
     p.createJelly = function(x, y) {
@@ -310,6 +373,88 @@ var p = GameState.prototype;
     // do
     // --------------------------------------------------------------
 
+    p.doSaltDestroy = function(salt) {
+        if (salt.body) {
+            salt.destroy();
+        }
+    };
+
+    p.doJellyDestroy = function(jelly) {
+        var self = this;
+
+        jelly.destroy();
+        self.jellyOpenedCount++;
+
+        console.log("self.jellyOpenedCount=%s", self.jellyOpenedCount);
+
+        if (self.jellyOpenedCount == 1) {
+            self.doBananaDrop(jelly.x, jelly.y);
+
+            self.doShoutEvent(0, "\"Bananas contain Potassium\"", 3500, function() {
+                self.doShoutEvent(0, "\"Just touch it to eat it.", 3000);
+            });
+        }
+        else {
+            if (self.jellyOpenedCount < 5) {
+                self.doBananaDrop(jelly.x, jelly.y);
+                self.jellySpawnTimer.resume();
+            }
+
+            else if (self.jellyOpenedCount == 5) {
+                self.createEnemy(jelly.x, jelly.y);
+                self.jellySpawnTimer.pause();
+            }
+
+            else {
+                
+                if (self.bananaEatenCount < 7) {
+                    self.doBananaDrop(jelly.x, jelly.y);
+                    self.jellySpawnTimer.resume();
+                }
+
+                if (self.bananaEatenCount == 7 && this.weapons.length < 2) {
+                    self.createShooter(jelly.x, jelly.y);
+                    self.doShoutEvent(500, "\"It's a Penicillin Salt Shooter.\"", 1500, function() {
+                        self.doShoutEvent(0, "\"It should help against bacteria!\"", 1500);
+                    });
+                }
+
+                if (self.bananaEatenCount >= 7) {
+                    var choice = self.game.rnd.weightedPick(["enemy", "banana"]);
+                    if (choice === "banana") {
+                        self.doBananaDrop(jelly.x, jelly.y);
+                    }
+                    else if (choice === "enemy") {
+                        self.createEnemy(jelly.x, jelly.y);
+                    }
+                    self.jellySpawnTimer.resume();
+                }
+            }
+
+            
+        }
+    };
+
+    p.doShoot = function() {
+        var salt = this.saltGroup.create(this.player.x, this.player.y, "salt");
+        salt.anchor.set(0.5,0.5);
+        this.game.physics.arcade.enable(salt);
+        this.game.physics.arcade.velocityFromRotation(
+            // self.game.math.reverseAngle(enemy.body.rotation), // get reflected angle
+            this.player.rotation,
+            GameState.PLAYER_SHOOT_STRENGTH, // force/speed
+            salt.body.velocity // resultant velocity
+        );
+        // salt.x += salt.body.velocity.x;
+        // salt.y += salt.body.velocity.y;
+    };
+
+    p.doWeaponSwitch = function() {
+        this.weaponIndex = (this.weaponIndex + 1) % (this.weapons.length);
+        this.currentWeapon = this.weapons[this.weaponIndex];
+        this.player_hand.animations.stop(this.currentWeapon, true);
+    };
+
     p.doBananaDrop = function(x, y) {
         var self = this;
         var banana = self.createBanana(x, y);
@@ -324,6 +469,14 @@ var p = GameState.prototype;
         banana.x += opposingVelocity.x;
         banana.y += opposingVelocity.y;
     };
+
+
+    p.doEnemyDestroy = function(enemy){
+        if (enemy.body) {
+            enemy.destroy();
+        }
+    };
+
     p.doEnemyStun = function(enemy) {
         var self = this;
         // kickback
@@ -355,7 +508,8 @@ var p = GameState.prototype;
 
     p.doShoutEvent = function(delay, text, duration, callback) {
         var self = this;
-        
+            
+        // this.gameEventTimer.stop(true);
         this.gameEventTimer.add(delay, function() {
             // After the delay, set the shout text
             self.shoutText.setText(text);
@@ -387,15 +541,64 @@ var p = GameState.prototype;
         if (this.scoreText) {
             this.scoreText.setText(this.bananaEatenCount);
         }
+        if (this.weaponText) {
+            this.weaponText.setText(this.weapons[this.weaponIndex]);
+        }
     };
 
     p.updatePhysics = function() {
         this.updateOverlaps();
-        this.game.physics.arcade.collide(this.agentGroup, this.enemyGroup);
+        this.game.physics.arcade.collide(this.agentGroup, this.enemyGroup, this.onAgentEnemyCollide, null, this);
         this.game.physics.arcade.collide(this.enemyGroup, this.enemyGroup);
         this.game.physics.arcade.collide(this.agentGroup, this.jellyGroup);
         this.game.physics.arcade.collide(this.enemyGroup, this.jellyGroup);
         this.game.physics.arcade.collide(this.agentGroup, this.bananaGroup, this.onAgentBananaCollide, null, this);
+        this.game.physics.arcade.collide(this.saltGroup, this.jellyGroup, this.onSaltJellyCollide, null, this);
+        this.game.physics.arcade.collide(this.saltGroup, this.enemyGroup, this.onSaltEnemyCollide, null, this);
+        if (this.shooter) {
+            this.game.physics.arcade.collide(this.agentGroup, this.shooterGroup, this.onAgentShooterCollide, null, this);
+        }
+    };
+
+    p.onAgentEnemyCollide = function(agent, enemy) {
+        var opposingVelocity = enemy.body.velocity;
+        var self = this;
+        self.game.physics.arcade.velocityFromRotation(
+            // self.game.math.reverseAngle(self.player.body.rotation), // get reflected angle
+            enemy.rotation,
+            2000, // force/speed
+            self.player.body.velocity // resultant velocity
+        );
+        if (self.bananaEatenCount > 0 ) {
+            self.bananaEatenCount--;
+        }
+    };
+
+    p.onAgentShooterCollide = function(agent, shooter) {
+        this.shooter.destroy();
+        this.shooter = null;
+        this.weapons.push("shoot");
+        this.doWeaponSwitch();
+        this.doShoutEvent("'Q' switches between weapons.", 3000);
+        this.jellySpawnTimer.resume();
+        this.weaponText.visible = true;
+    };
+
+    p.onSaltEnemyCollide = function(salt, enemy) {
+        if (salt.body) {
+            this.doEnemyDestroy(enemy);
+            this.doSaltDestroy(salt);
+        }
+        
+        
+    };
+
+    p.onSaltJellyCollide = function(salt, jelly) {
+
+        if (salt.body && jelly.body) {
+            this.doJellyDestroy(jelly);
+            this.doSaltDestroy(salt);
+        }
     };
 
     p.updateOverlaps = function() {
@@ -431,53 +634,7 @@ var p = GameState.prototype;
                     if (self.player_hand.animations.currentAnim.name === "punch" &&
                         self.player_hand.animations.currentAnim.isPlaying) {
                         
-                        jelly.destroy();
-                        self.jellyOpenedCount++;
-
-                        console.log("self.jellyOpenedCount=%s", self.jellyOpenedCount);
-
-                        if (self.jellyOpenedCount == 1) {
-                            self.doBananaDrop(jelly.x, jelly.y);
-
-                            self.doShoutEvent(0, "\"Bananas contain Potassium\"", 3500, function() {
-                                self.doShoutEvent(0, "\"Just touch it to eat it.", 3000);
-                            });
-                        }
-                        else {
-                            if (self.jellyOpenedCount < 5) {
-                                self.doBananaDrop(jelly.x, jelly.y);
-                                self.jellySpawnTimer.resume();
-                            }
-
-                            if (self.jellyOpenedCount == 5) {
-                                self.createEnemy(jelly.x, jelly.y);
-                                self.jellySpawnTimer.pause();
-                            }
-
-                            if (self.jellyOpenedCount > 5 && self.jellyOpenedCount < 7) {
-                                var choice = self.game.rnd.weightedPick(["banana", "enemy"]);
-                                if (choice === "banana") {
-                                    self.doBananaDrop(jelly.x, jelly.y);
-                                }
-                                else if (choice === "enemy") {
-                                    self.createEnemey(jelly.x, jelly.y);
-                                }
-                                self.jellySpawnTimer.resume();
-                            }
-
-                            if (self.jellyOpenedCount == 7) {
-                                self.doShoutEvent(500, "\"Aha!\"", 1000, function() {
-                                    self.doShoutEvent(0, "\"Found something that might help\"");
-                                });
-                            }
-
-                            
-                            
-                        }
-
-                        
-
-
+                        self.doJellyDestroy(jelly);
 
                     }
                 }
@@ -524,11 +681,26 @@ var p = GameState.prototype;
     };
 
     p.updatePlayerActions = function() {
+        var self = this;
         if (this.game.input.activePointer.isDown) {
+            var currentWeapon = this.weapons[this.weaponIndex];
             if (this.player_hand.animations.currentAnim.name === "idle") {
                 this.player_hand.animations.play("punch");
             }
+            else if (   this.player_hand.animations.currentAnim.name === currentWeapon &&
+                        this.player_hand.animations.currentAnim.isFinished) {
+
+                console.log("currentWeapon=%s", currentWeapon);
+                this.player_hand.animations.play(currentWeapon);
+
+                if (currentWeapon === "shoot") {
+                    this.doShoot();
+                }
+
+            }
         }
+
+
     };
 
     p.updatePlayerRotation = function() {
@@ -624,6 +796,16 @@ var p = GameState.prototype;
         }
         if (this.bananaEatenCount == 4) {
             self.doShoutEvent(0, "\"You're doing great!", 2000);
+        }
+
+        if (this.bananaEatenCount == 7) {
+            self.doShoutEvent(0, "\"I found something to help!", 1500, function() {
+                    self.doShoutEvent(0, "\"It's in the next agar!\"", 1500);
+            });
+        }
+
+        if (this.bananaEatenCount == GameState.BANANAS_TO_WIN) {
+            this.game.state.start("WinState");
         }
         
     };

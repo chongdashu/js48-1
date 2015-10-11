@@ -50,6 +50,8 @@ var p = PreloadState.prototype;
         this.load.image("player_base", "res/player_base.png");
         this.load.image("player_head", "res/player_head.png");
         this.load.image("banana", "res/banana.png");
+        this.load.image("salt", "res/salt.png");
+        this.load.image("shooter", "res/shooter.png");
         this.load.spritesheet("enemy-green", "res/enemy-green.png", 32, 32);
         this.load.spritesheet("player_hand", "res/player_hand.png", 48, 32);
         this.load.spritesheet("jelly", "res/jelly.png", 32, 32);
@@ -61,7 +63,7 @@ var p = PreloadState.prototype;
     p.create = function() {
         console.log("[PreloadState], create()");
         this.loadingBar.cropEnabled = false;
-        this.state.start("GameState");
+        this.state.start("MenuState");
         
     };
 
